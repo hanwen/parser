@@ -1,8 +1,9 @@
 
-This is a small library written in Go for parsing LISP, with an
-accompanying tool for finding symbol definitions.
+This is a small library written in Go for parsing various programming
+languages.
 
-On my X220 laptop, parse speed is about 3mb/s.
+Currently it supports LISP, and comes with a tool for finding symbol
+definitions.
 
 DISCLAIMER
 

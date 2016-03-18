@@ -8,7 +8,7 @@ import (
 	"log"
 	"regexp"
 
-	"github.com/hanwen/lisp"
+	"github.com/hanwen/parser/lisp"
 )
 
 func toSym(e lisp.Expr) string {
