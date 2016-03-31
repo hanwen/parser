@@ -1,9 +1,8 @@
 
-This is a small library written in Go for parsing various programming
+This is a small library written in Go for parsing programming
 languages.
 
-Currently it supports LISP, and comes with a tool for finding symbol
-definitions.
+Currently it supports LISP and a pathetic attempt at parsing Java.
 
 DISCLAIMER
 
