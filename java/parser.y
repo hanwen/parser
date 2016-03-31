@@ -12,8 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// A parser for Java. It is incomplete, and can fundamentally not work
-// unless we introduce heuristics for type names vs. object names.
+/*
+
+A parser for Java. It is incomplete, and can fundamentally not work in
+its current form. The biggest problem is that we can't tell from
+identifiers whether they refer to types or objects: does "a.b" mean
+"varA.memberB" or "packageA.typeB"?
+
+This has the following repercussions:
+
+ * a < b > c
+
+  can be "typeA<typeB> c" or (varA < varB) > varC.
+
+ * (a)(b)
+
+  could be (funcA)(varB) or (typeA)(varB)
+
+ * Since a.b can be either a type or variable (expression), a
+   simplistic grammar such as
+
+   expression:
+      identifier
+      ;
+   type_specifier:
+      identifier
+      ;
+   statement:
+      expression ';'
+      | type_specifier identifier ';'
+      ;
+
+   is ambiguous: with a single token lookahead, you can't decide which
+   production to pick if you encounterf an identifier trying to parse
+   a statement. I tried to work around this by having "type_specifier
+   identifier" be an expression, but this makes type casts problematic
+   (see previous point.)
+
+The parser in org.eclipse.jdt.core seems to handle this with lots of
+extra rules to disambiguate certain constructions, and from inside the
+lexer a separate parser is started to disambiguate some tokens. In
+particular, it tries a parse to emit TokenNameBeginTypeArguments if is
+at a '<' token. (see
+compiler/org/eclipse/jdt/internal/compiler/parser/Scanner.java), to
+avoid the < (less than) vs < (generic type argument) ambiguity.
+
+*/
 
 %{
 
@@ -95,15 +139,6 @@ file_decl:
 	}
 	;
 
-/*
-  This is a disaster: imagine
-
-    a.b
-
-  is this the type identifier b from package a, or is this an object
-  named a with member b?
-*/
-
 qualified_id:
 	identifier {}
 	| qualified_id '.' identifier
@@ -174,15 +209,6 @@ expression:
 
 	}
 	| '(' expression ')' { }
-/* type casts are a mess up: we'll just have to error out on them.
-
-   (a)(b)
-
-   is this function a called with b as arg, or is this expression b
-   cast to type a? The only way around this is to have heuristics
-   which guess if a (qualified) identifier is a typename or a instance
-   name.
- */
 	| expression INSTANCEOF qualified_id {
 
         }
@@ -235,14 +261,6 @@ expression:
 	| expression EQUAL_EQUAL expression { }
 	| expression EXCLAMATION_EQUAL expression { }
 	| expression '<' expression {
-	  /* a < b > c
-
-             is this typeA<typeB> c
-
-             or (a < b) > c ?
-
-             again, we must guess if an identifier is a type or an object.
-           */
         }
 	| expression '>' expression {
 	}
