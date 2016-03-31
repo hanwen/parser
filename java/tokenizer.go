@@ -34,6 +34,7 @@ var reservedWords = map[string]int{
 	"class":        CLASS,
 	"default":      DEFAULT,
 	"else":         ELSE,
+	"enum": ENUM,
 	"extends":      EXTENDS,
 	"final":        FINAL,
 	"finally":      FINALLY,
@@ -61,6 +62,8 @@ var reservedWords = map[string]int{
 var reservedWordStrings = map[int]string{}
 
 var compoundTokens = map[string]int{
+	"...": DOT_DOT_DOT,
+	"..": DOT_DOT,
 	"*=":  STAR_EQUAL,
 	"+=":  PLUS_EQUAL,
 	"/=":  SLASH_EQUAL,
@@ -72,7 +75,6 @@ var compoundTokens = map[string]int{
 	"|=":  BAR_EQUAL,
 	"<<":  LESS_LESS,
 	"<<=": LESS_LESS_EQUAL,
-	">>":  MORE_MORE,
 	"!=":  EXCLAMATION_EQUAL,
 	"==":  EQUAL_EQUAL,
 }
@@ -122,20 +124,20 @@ func (t *tokenizer) Error(e string) {
 func (t *tokenizer) Lex(l *yySymType) int {
 	r := t.iLex(l)
 	if t.debug {
-		fmt.Printf("pos %v: %v\n", t.Scanner.Position, tokenString(r, l.Text))
+		fmt.Printf("pos %v: %v\n", t.Scanner.Position, tokenString(r, l.text))
 	}
 	return r
 }
 
 func (t *tokenizer) iLex(l *yySymType) int {
-	l.Text = ""
+	l.text = ""
 	for {
 		r := t.Scanner.Scan()
-		l.Text += t.Scanner.TokenText()
+		l.text += t.Scanner.TokenText()
 
 		switch r {
 		case scanner.Ident:
-			if v, ok := reservedWords[l.Text]; ok {
+			if v, ok := reservedWords[l.text]; ok {
 				return v
 			}
 
@@ -144,7 +146,7 @@ func (t *tokenizer) iLex(l *yySymType) int {
 			p := t.Scanner.Peek()
 			if p == 'l' || p == 'L' {
 				t.Scanner.Next()
-				l.Text += string([]rune{p})
+				l.text += string([]rune{p})
 				return NUM
 			}
 
@@ -153,9 +155,9 @@ func (t *tokenizer) iLex(l *yySymType) int {
 			return STRING
 		}
 
-		if curCode, ok := compoundTokens[l.Text]; ok {
+		if curCode, ok := compoundTokens[l.text]; ok {
 			p := t.Scanner.Peek()
-			if _, next := compoundTokens[l.Text+string([]rune{p})]; next {
+			if _, next := compoundTokens[l.text+string([]rune{p})]; next {
 				continue
 			}
 

@@ -86,7 +86,7 @@ func tokenCodes(in string) []tokData {
 			break
 		}
 
-		res = append(res, tokData{r, sym.Text})
+		res = append(res, tokData{r, sym.text})
 	}
 	return res
 }

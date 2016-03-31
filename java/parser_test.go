@@ -16,6 +16,7 @@ package java
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 )
 
@@ -23,6 +24,7 @@ type testCase struct {
 	name  string
 	in    string
 	debug bool
+	full bool
 }
 
 func TestParse(t *testing.T) {
@@ -159,14 +161,67 @@ func TestParse(t *testing.T) {
   public byte []bla;
 `,
 		},
+		{
+			name: "enum",
+			full: true,
+		in: `package foo;
+enum P {
+ A(1), B;
+ void f() {}
+}`,
+		},
+		{
+			name: "nested class",
+			in: `static class Inner { } int outer = 1;`,
+		},{
+			name: "...",
+			in: `static ImmutableSet<Field> setOf(Iterable<Field> base, Field... fields) {
+      return Sets.immutableEnumSet(Iterables.concat(base, Arrays.asList(fields)));
+    }`,
+		},
 	}
 
 	for _, c := range cases {
-		full := "package pkg; class Klass {" + c.in + "}"
+		full := c.in
+		if !c.full {
+			full = "package pkg; class Klass {" + c.in + "}"
+		}
 
 		_, err := Parse(bytes.NewBufferString(full), c.debug)
 		if err != nil {
 			t.Errorf("%s: yyParse failed", c.name)
 		}
+	}
+}
+
+func TestDecls(t *testing.T) {
+	in := `package foo; class Klass {
+  int x = 1;
+  Object j() { return null; }
+}`
+	got, err := Parse(bytes.NewBufferString(in), false)
+	if err != nil {
+		t.Errorf("parse: %v", err)
+	}
+
+	want := &ClassDecl{
+		Decl: Decl{
+			Name: "Klass",
+			Type: "class",
+		},
+		Members: []Node{
+			&Decl{Name: "x", Type: "int"},
+			&Decl{Name: "j", Type: "Object"},
+		},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+
+	wantSyms := []string{"Klass:class", "x:int", "j:Object"}
+	gotSyms := Symbols(got)
+	if !reflect.DeepEqual(gotSyms, wantSyms) {
+		t.Errorf("got syms %v, want %v", gotSyms, wantSyms)
 	}
 }

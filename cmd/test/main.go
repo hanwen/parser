@@ -6,12 +6,15 @@ import (
 	"io/ioutil"
 	"bytes"
 	"os"
+	"path/filepath"
 
 	"github.com/hanwen/parser/java"
 )
 
 func main() {
-	debug := flag.Bool("debug", false, "dump debug info")
+	debug := flag.Bool("debug", false, "dump debug info");
+	syms := flag.Bool("syms", false, "dump symbols found");
+
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -27,8 +30,11 @@ func main() {
 			continue
 		}
 
-		_, err = java.Parse(bytes.NewBuffer(c), *debug)
-		log.Printf("Parse(%s): %v\n", a, err)
+		node, err := java.Parse(bytes.NewBuffer(c), *debug)
+		log.Println("parse", a, err)
+		if *syms && node != nil {
+			log.Printf("%s: %s", filepath.Base(a), java.Symbols(node))
+		}
 	}
 	os.Exit(exitCode)
 }

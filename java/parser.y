@@ -22,11 +22,15 @@ package java
 %}
 
 %union {
-	Text string
-	Expr Expr
+	text string
+	node Node
+        classDecl *ClassDecl
 }
 
-%type <expr> expression
+%type <classDecl> class_decl class_body annotated_class_decl
+%type <text> identifier
+%type <node> class_element_decl
+%type <text> type_specifier
 
 %token ABSTRACT
 %token BREAK
@@ -35,6 +39,7 @@ package java
 %token CLASS
 %token DEFAULT
 %token ELSE
+%token ENUM
 %token EXTENDS
 %token FINAL
 %token FINALLY
@@ -58,6 +63,8 @@ package java
 %token TRY
 %token WHILE
 
+%token DOT_DOT_DOT DOT_DOT
+
 %token <Text> STRING NUM IDENTIFIER
 
 %left '!'
@@ -71,7 +78,7 @@ package java
 %left '^'
 %left '|'
 
-%left LESS_LESS MORE_MORE
+%left LESS_LESS
 %left '=' SLASH_EQUAL PLUS_EQUAL LESS_LESS_EQUAL STAR_EQUAL EXCLAMATION_EQUAL BAR_EQUAL AMPERSAND_EQUAL
 %left EQUAL_EQUAL LESS_EQUAL MORE_EQUAL
 %left AMPERSAND_AMPERSAND BAR_BAR
@@ -83,7 +90,9 @@ package java
 %%
 
 file_decl:
-	package_stmt import_stmts annotated_class_decl;
+	package_stmt import_stmts annotated_class_decl {
+		compilationUnitNode = $3;
+	}
 	;
 
 /*
@@ -116,7 +125,9 @@ import_stmt:
 	;
 
 annotated_class_decl:
-	annotations class_decl {}
+	annotations class_decl {
+		$$ = $2;
+	}
 	;
 
 annotations:
@@ -216,6 +227,11 @@ expression:
 	| expression LESS_LESS expression {
 
         }
+	| expression '>' '>' expression {
+		/* WTF:  >> is not a token.
+		private Map<AnyObjectId, Set<Ref>> refsById;
+		*/
+        }
 	| expression EQUAL_EQUAL expression { }
 	| expression EXCLAMATION_EQUAL expression { }
 	| expression '<' expression {
@@ -228,7 +244,9 @@ expression:
              again, we must guess if an identifier is a type or an object.
            */
         }
-	| expression '>' expression { }
+	| expression '>' expression {
+	}
+
 	;
 
 decl_modifier:
@@ -247,11 +265,17 @@ decl_modifiers:
 
 class_decl:
 	decl_modifiers CLASS identifier class_inheritance class_impl '{' class_body '}' {
-
+          $$ = $7
+	  $$.Decl = Decl{
+			  Type: "class",
+			  Name: $3,
+	  }
 	}
+	| decl_modifiers ENUM identifier '{' enum_body '}' {}
 	;
 
-identifier: IDENTIFIER
+
+identifier: IDENTIFIER { }
 	;
 
 class_inheritance:
@@ -270,20 +294,46 @@ interfaces:
 	;
 
 class_body:
-	/* */ { }
+	/* */ { $$ = &ClassDecl{} }
 	| class_body class_element_decl {
-
+		$$.Members = append($$.Members, $2)
 	}
 	;
 
 opt_method_overrides: | '{' class_body '}'
 	;
 
+enum_body:
+	enum_elts ';'
+	| enum_body class_element_decl
+	;
+
+enum_elts:
+	enum_elt
+	| enum_elts ',' enum_elt
+	;
+
+enum_elt:
+	identifier
+	| identifier '(' arg_list ')'
+	;
+
 class_element_decl:
-	annotations decl_modifiers type_specifier identifier class_var_init
+	annotations decl_modifiers type_specifier identifier class_var_init {
+		$$ = &Decl{
+			Name: $4,
+			Type: $3,
+		}
+	}
 	| annotations decl_modifiers identifier class_var_init {
                   /* ctor. Sigh. */
+		$$ = &Decl{
+			Name: $3,
+			Type: "void",
+		}
         }
+	| annotated_class_decl {
+	}
 	;
 
 class_var_init:
@@ -352,7 +402,15 @@ opt_else:
 	;
 
 try_catch:
-	TRY '{' statement_list '}' CATCH '(' exception_catch_var ')' '{' statement_list '}' opt_finally
+	TRY opt_resource '{' statement_list '}' opt_catch  opt_finally
+	;
+
+opt_catch:
+	| CATCH '(' exception_catch_var ')' '{' statement_list '}'
+	;
+
+opt_resource:
+	| '(' type_specifier identifier '=' expression ')'
 	;
 
 opt_finally:
@@ -387,14 +445,18 @@ non_empty_formal_arg_list:
 	;
 
 formal_arg_elt:
-	decl_modifiers type_specifier identifier { }
+	annotations decl_modifiers type_specifier opt_dotdotdot identifier { }
+	;
+
+opt_dotdotdot:
+	| DOT_DOT_DOT
 	;
 
 type_specifier:
 	identifier
-        | '?'
-        | identifier gen_type_arg
-	| type_specifier '[' ']'
+	| '?' { $$ = "?" }
+	| identifier gen_type_arg { $$ = $1 }
+	| type_specifier '[' ']' { $$ = $1 + "[]" }
 	;
 
 gen_type_arg:
@@ -402,14 +464,9 @@ gen_type_arg:
         | '<' '>'
         ;
 
-gen_type:
-	qualified_id
-        | '?'
-        ;
-
 gen_type_list:
-	gen_type
-        | gen_type ',' gen_type
+	type_specifier
+        | type_specifier ',' type_specifier
         ;
 
 throws_decl:
@@ -425,7 +482,4 @@ nonempty_qualified_identifier_list:
 
 %%
 
-type Expr struct {
-	Head string
-	Children []Expr
-}
+var compilationUnitNode Node

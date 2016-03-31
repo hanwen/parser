@@ -21,7 +21,7 @@ import (
 	"strings"
 )
 
-func Parse(r io.Reader, debug bool) (*Expr, error) {
+func Parse(r io.Reader, debug bool) (Node, error) {
 	tok := newTokenizer(r)
 	tok.debug = debug
 	if debug {
@@ -33,7 +33,22 @@ func Parse(r io.Reader, debug bool) (*Expr, error) {
 		return nil, fmt.Errorf("yyParse failed")
 	}
 	if len(tok.errors) > 0 {
-		return nil, errors.New(strings.Join(tok.errors, "\n"))
+		return compilationUnitNode, errors.New(strings.Join(tok.errors, "\n"))
 	}
-	return nil, nil
+	return compilationUnitNode, nil
+}
+
+
+func Symbols(node Node) []string {
+	var syms []string
+	switch n := node.(type) {
+	case *ClassDecl:
+		syms = append(syms, n.Decl.String())
+		for _, mem := range n.Members {
+			syms = append(syms, Symbols(mem)...)
+		}
+	case *Decl:
+		syms = append(syms, n.String())
+	}
+	return syms
 }
